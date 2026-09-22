@@ -1,0 +1,37 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+
+# ---- Data (never push raw medical images / large files to GitHub) ----
+data/train_ROCOv2/
+data/test_ROCOv2/
+data/*.zip
+data/*.csv
+*.jpg
+*.jpeg
+*.png
+!docs/images/*.png
+!docs/images/*.jpg
+
+# ---- Model checkpoints / weights (large binaries) ----
+checkpoints/
+blip-finetuned/
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# ---- Logs / OS junk ----
+*.log
+.DS_Store
+Thumbs.db
+
+# ---- Environment ----
+.env
