@@ -1,0 +1,41 @@
+{
+  "status": "completed",
+  "base_model": "Salesforce/blip-image-captioning-base",
+  "training_fraction": 0.1,
+  "training_images": 5996,
+  "test_images": 9927,
+  "epochs": 6,
+  "seed": 42,
+  "parameter_counts": {
+    "total": 224266556,
+    "trainable": 294912
+  },
+  "settings": {
+    "Trainable scope": "Query/key LoRA adapters; base model frozen",
+    "LoRA rank / alpha / dropout": "8 / 16 / 0.1",
+    "LoRA targets": "`attention.self.query`, `attention.self.key`",
+    "Training batch size": "3",
+    "Learning rate / weight decay": "5e-5 / 0.01",
+    "Training precision": "FP32",
+    "Training text limit": "512 tokens",
+    "Decoding": "Beam search, 4 beams",
+    "Generation maximum length": "128 tokens"
+  },
+  "environment": {
+    "python": "3.13.15",
+    "torch": "2.11.0+cu128",
+    "transformers": "4.57.6",
+    "peft": "0.18.1",
+    "accelerate": "1.12.0",
+    "numpy": "2.1.3",
+    "pandas": "2.3.3",
+    "pycocoevalcap": "1.2",
+    "gpu": "Tesla T4"
+  },
+  "checkpoint_selection": "last completed epoch; no validation-based selection",
+  "zero_shot_baseline_run": false,
+  "evidence": "Saved cell outputs in the accompanying executed notebook; no experiment was rerun for packaging.",
+  "metrics_precision": "Four decimal places, as printed in the executed notebook. The original full-precision runtime metrics.json was not supplied.",
+  "history_precision": "Six decimal places, as displayed in the executed notebook.",
+  "notebook_sha256": "5f63281a21d84b1c04ef22f4b7e56e398824af6fdb29dc989899555eab47b241"
+}
