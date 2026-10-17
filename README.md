@@ -1,164 +1,82 @@
-# Medical Image Captioning with BLIP (ROCOv2 Dataset)
+# Medical Image Captioning with BLIP + LoRA on ROCOv2
 
-This project implements **medical image captioning** using the **BLIP (Salesforce BLIP-Base)** model,
-fine-tuned with **LoRA**, on the **ROCOv2** dataset. The goal is to generate textual descriptions
-for medical images, including X-rays and CT scans.
+A limited-data experiment by **Arezoo Pasand** exploring the adaptation of a pretrained vision-language model to medical image captioning.
 
----
+**Status:** six training epochs and evaluation on the full 9,927-image test split are complete. This repository reports the observed results, including remaining caption errors. The experiment used 10% of the training split under a limited GPU budget.
 
-## Repository Structure
+## Method
 
-```
-medical-image-captioning-blip/
-├── README.md                 # this file
-├── LICENSE                   # MIT license for the code (data has its own license, see below)
-├── requirements.txt          # Python dependencies
-├── .gitignore
-├── configs/
-│   └── config.yaml           # paths + hyperparameters (single source of truth)
-├── data/                     # NOT committed to git — populated by scripts/download_data.sh
-│   └── .gitkeep
-├── notebooks/
-│   └── Part3_6Epoch_Finetune_10pct_Data.ipynb   # original exploratory notebook (Kaggle)
-├── src/
-│   ├── data/
-│   │   ├── download.py       # downloads + extracts ROCOv2 from Zenodo
-│   │   └── dataset.py        # Dataset / collate_fn classes
-│   ├── models/
-│   │   └── blip_lora.py      # BLIP + LoRA model builder
-│   ├── train.py              # training entry point (python -m src.train)
-│   ├── evaluate.py           # evaluation entry point (python -m src.evaluate)
-│   └── utils.py               # config loading, device helpers
-├── scripts/
-│   ├── download_data.sh
-│   └── run_train.sh          # train then evaluate, end to end
-├── results/
-│   └── metrics.md            # reported BLEU/METEOR/ROUGE-L/CIDEr scores
-└── docs/
-    └── images/                # figures/screenshots for the README (optional)
-```
+The experiment adapts a pretrained BLIP image-captioning model using LoRA on query and key projections. RGB images are processed with BlipProcessor. Captions use dynamic padding, attention masks, and ignored padding labels. Training starts with the decoder BOS token. Evaluation reloads the saved adapter before generating captions.
 
-> **Note on the notebook:** only the "6-epoch, 10%-data" notebook was available when this
-> repository was assembled. If you also have the earlier exploration/4-epoch notebooks,
-> drop them into `notebooks/` (e.g. `Part1_Data_Preparation.ipynb`, `Part2_4Epoch_Finetune.ipynb`)
-> so the full history is preserved — the scripts under `src/` already cover the same logic
-> in reusable form, so the notebooks become supplementary rather than required.
+## Experiment setup
 
----
+| Setting | Value |
+|---|---|
+| Base checkpoint | `Salesforce/blip-image-captioning-base` |
+| Training subset | 5,996 images; 10% of the training split |
+| Test set | 9,927 images; full test split |
+| Epochs / seed | 6 / 42 |
+| Total / trainable parameters | 224,266,556 / 294,912 |
+| Trainable scope | Query/key LoRA adapters; base model frozen |
+| LoRA rank / alpha / dropout | 8 / 16 / 0.1 |
+| LoRA targets | `attention.self.query`, `attention.self.key` |
+| Training batch size | 3 |
+| Learning rate / weight decay | 5e-5 / 0.01 |
+| Training precision | FP32 |
+| Training text limit | 512 tokens |
+| Decoding | Beam search, 4 beams |
+| Generation maximum length | 128 tokens |
+| Scheduler / warm-up | Linear / 0 |
+| Checkpoint selection | Last completed epoch |
+| GPU | Tesla T4 |
 
-## Project Steps
+## Results
 
-### 1. Data Loading and Preprocessing
-- Load medical images and captions from **ROCOv2**.
-- Resize images to **224×224 pixels**.
-- Process captions using **BlipProcessor**.
-- Split dataset into **training and test sets**.
-- Use **10% of training data** for faster training on limited GPU.
+| Metric | Score |
+|---|---:|
+| BLEU-1 | 0.1461 |
+| BLEU-2 | 0.0655 |
+| BLEU-3 | 0.0225 |
+| BLEU-4 | 0.0078 |
+| METEOR | 0.0475 |
+| ROUGE-L | 0.1302 |
+| CIDEr | 0.0351 |
 
-### 2. Model Architecture (BLIP + LoRA)
-- **Encoder**: Vision Transformer (BLIP)
-- **Decoder**: Text generation with GPT-style decoder
-- **LoRA Fine-Tuning**: Applied to attention layers (query & key) to reduce trainable parameters and memory usage.
+Scores are reported as printed by the executed notebook, rounded to four decimal places; they are not percentages. Evaluation uses the COCO PTB tokenizer and pycocoevalcap for BLEU, METEOR, ROUGE-L, and CIDEr. Predictions are compared with the original reference captions.
 
-### 3. Training
-- **Optimizer**: AdamW
-- **Scheduler**: Linear
-- **Batch size**: 3
-- **Epochs**: 4 and 6 (10% of data)
-- Model and optimizer states are saved after each epoch.
+### Training history
 
-### 4. Evaluation
-- Generate captions for test images.
-- **Metrics**: BLEU (1–4), METEOR, ROUGE-L, CIDEr.
+| Epoch | Training loss |
+|---|---:|
+| 1 | 6.466787 |
+| 2 | 6.145403 |
+| 3 | 6.033801 |
+| 4 | 5.968374 |
+| 5 | 5.915012 |
+| 6 | 5.904488 |
 
-### 5. Results
+Training loss decreased during the run. This measures fit to the training data; it does not establish generalization or rule out overfitting.
 
-See [`results/metrics.md`](results/metrics.md):
+### Qualitative observations and limitations
 
-| Metric   | BLIP 4 Epochs | BLIP 6 Epochs | Without Fine-tune |
-|----------|---------------|---------------|--------------------|
-| BLEU-1   | 0.0470        | 0.0545        | 0.0433             |
-| BLEU-2   | 0.0222        | 0.0255        | 0.0151             |
-| METEOR   | 0.0270        | 0.0278        | 0.0171             |
-| ROUGE-L  | 0.0882        | 0.0892        | 0.0812             |
-| CIDEr    | 0.0387        | 0.0401        | 0.0056             |
+Some displayed captions describe incorrect objects or anatomy, and several repeat phrases. One displayed prediction is "an image of a bird on a black background" for a medical image. These examples show that caption content and repetition remain limitations of this run.
 
-### 6. Future Improvements
-- Train with **larger data (>10%)** for better results.
-- Explore other **Vision Transformer encoders**.
-- Tune hyperparameters and use longer epochs.
-- Apply **data augmentation**.
+- This is a single run on a 10% training subset. The reported results do not establish which factors caused the remaining errors.
+- Training used a fixed six-epoch protocol, with no validation-based checkpoint selection or early stopping.
+- A zero-shot baseline and repeated-seed experiments were not run. No improvement over the pretrained base model is claimed.
+- The companion BLIP and ViT-GPT2 runs differ in trainable parameter count and decoding settings. Their scores are not a controlled comparison of the two architectures.
 
----
+## Files
 
-## Getting Started
+- [Executed notebook](notebooks/BLIP_LoRA_ROCOv2_Executed.ipynb): the complete English notebook, including source-writing cells, training logs, saved metric outputs, and displayed predictions.
+- [Metric scores](results/metrics.json): scores transcribed from the saved notebook output at its printed precision.
+- [Training history](results/training_history.csv): epoch losses transcribed from the saved notebook output.
+- [Run summary](results/run_summary.json): settings, parameter counts, runtime versions, and evidence provenance.
 
-### 1. Clone and install
-```bash
-git clone https://github.com/<your-username>/medical-image-captioning-blip.git
-cd medical-image-captioning-blip
-pip install -r requirements.txt
-```
+The executed notebook is preserved byte-for-byte from the completed run. Viewing its saved outputs does not require a GPU. Dataset images, trained checkpoints, and the full per-image predictions CSV are not included in this results package.
 
-### 2. Download the dataset
-```bash
-bash scripts/download_data.sh
-```
-This downloads ROCOv2 from Zenodo and extracts it into `data/`.
+## Notebook execution
 
-### 3. Train and evaluate
-```bash
-bash scripts/run_train.sh
-```
-Or run each step separately:
-```bash
-python -m src.train --config configs/config.yaml
-python -m src.evaluate --config configs/config.yaml
-```
+The notebook embeds the project modules and writes them into its working directory. To reproduce the experiment, use a fresh Kaggle session, review the configuration and dependency cells, supply or download ROCOv2 and the base checkpoint, and execute the cells in order. Follow any kernel-restart instruction from the installation cell. Training is optional for readers who only want to inspect the saved results.
 
-All paths and hyperparameters (batch size, epochs, LoRA rank, etc.) live in
-`configs/config.yaml`, so you don't need to touch the source code to tweak a run.
-
----
-
-## Dataset
-**ROCOv2: Radiology Objects in Context Version 2**
-- 79,789 radiological images with captions and clinical concepts
-- Seven clinical modalities, manually curated medical concepts
-- Suitable for image captioning and multi-label classification
-
-**Dataset Link**: [ROCOv2 Dataset](https://zenodo.org/records/10821435)
-
-**Citation (APA):**
-> Johannes Rückert, Louise Bloch, Raphael Brüngel, Ahmad Idrissi-Yaghir, Henning Schäfer, Cynthia S. Schmidt, Sven Koitka, Obioma Pelka, Asma Ben Abacha, Alba Garcia Seco de Herrera, Henning Müller, Peter A. Horn, Felix Nensa, & Christoph M. Friedrich. (2023). ROCOv2: Radiology Objects in COntext Version 2, An Updated Multimodal Image Dataset [Data set]. *Scientific Data (2.0.1)*. Zenodo. https://doi.org/10.5281/zenodo.10821435
-
-### Dataset License
-- **License**: Creative Commons Attribution Non-Commercial 4.0 International (CC BY-NC 4.0)
-- The dataset may be used for **research and educational purposes only**; **commercial use is not allowed**.
-- Users must **cite the original dataset** when using it in publications or projects.
-- Official dataset page: [ROCOv2 Dataset](https://zenodo.org/records/10821435)
-
-The **code** in this repository is released under the [MIT License](LICENSE); the dataset
-itself keeps its own separate CC BY-NC 4.0 license as noted above.
-
----
-
-## Requirements
-See [`requirements.txt`](requirements.txt):
-```
-torch>=2.0
-transformers>=4.10.3
-datasets>=2.20.0
-peft
-bitsandbytes
-pycocoevalcap
-evaluate
-sacrebleu
-nltk
-rouge-score
-numpy
-pandas
-matplotlib
-tqdm
-Pillow
-```
+The reported runtime used Python 3.13.15, PyTorch 2.11.0+cu128, Transformers 4.57.6, PEFT 0.18.1, Accelerate 1.12.0, and pycocoevalcap 1.2. Java was available for PTB tokenization and METEOR. A single completed run is reported; exact reproducibility across different environments has not been established.
